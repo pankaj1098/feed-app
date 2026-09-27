@@ -27,11 +27,17 @@ export default function Header({
             aria-expanded={profileOpen}
             aria-label="Open profile menu"
           >
-            <img
-              className="account-avatar"
-              src={user.avatar}
-              alt={user.author}
-            />
+            {user?.avatar ? (
+              <img
+                className="account-avatar"
+                src={user.avatar}
+                alt={user.author}
+              />
+            ) : (
+              <span className="account-avatar avatar-placeholder" aria-hidden="true">
+                <Icon name="profile" />
+              </span>
+            )}
             <Icon name="chevron" />
           </button>
           {profileOpen && (

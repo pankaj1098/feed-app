@@ -3,7 +3,7 @@ import AuthLayout from "./AuthLayout";
 import { AuthInput, SocialButtons } from "./AuthFields";
 import { loginUser, googleLogin } from "../services/authApi";
 
-export default function LoginPage({ onSignup, onLogin }) {
+export default function LoginPage({ onSignup, onLogin, onForgotPassword }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -54,7 +54,7 @@ export default function LoginPage({ onSignup, onLogin }) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <button type="button" className="forgot-link">
+        <button type="button" className="forgot-link" onClick={onForgotPassword}>
           Forgot password?
         </button>
         {error && (

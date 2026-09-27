@@ -897,6 +897,11 @@ button {
   color: #d93142;
   font-size: 14px;
 }
+.form-success {
+  margin: 16px 0 -13px;
+  color: #188b43;
+  font-size: 14px;
+}
 .profile-loading {
   padding: 60px 0;
   text-align: center;

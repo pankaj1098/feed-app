@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { Icon } from "./Icons";
 import { getProfile, updateProfile } from "../services/userApi";
 
@@ -20,6 +20,7 @@ const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export default function EditProfilePage() {
   const navigate = useNavigate();
+  const { onProfileUpdated } = useOutletContext();
   const fileInputRef = useRef(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -72,10 +73,11 @@ export default function EditProfilePage() {
     setIsSaving(true);
     setError("");
     try {
-      await updateProfile({
+      const updatedProfile = await updateProfile({
         ...form,
         ...(avatarFile ? { avatar: avatarFile } : {}),
       });
+      onProfileUpdated(updatedProfile);
       navigate("/profile");
     } catch (requestError) {
       setError(requestError.message);

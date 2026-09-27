@@ -12,9 +12,10 @@ import FeedCard from "./components/FeedCard";
 import CreatePostModal from "./components/CreatePostModal";
 import LoginPage from "./components/LoginPage";
 import SignupPage from "./components/SignupPage";
+import ForgotPasswordPage from "./components/ForgotPasswordPage";
+import ResetPasswordPage from "./components/ResetPasswordPage";
 import MyProfilePage from "./components/MyProfilePage";
 import EditProfilePage from "./components/EditProfilePage";
-import { posts } from "./data/posts";
 import {
   createPost,
   deletePost,
@@ -25,12 +26,11 @@ import {
 import { logoutUser } from "./services/authApi";
 import { getProfile } from "./services/userApi";
 
-const user = posts[0];
 const toFeedPost = (post) => ({
   ...post,
   authorId: post.author?._id || post.author,
-  author: post.author?.userName || user.author,
-  avatar: post.author?.avatar?.url || user.avatar,
+  author: post.author?.userName || "Unknown user",
+  avatar: post.author?.avatar?.url || "",
   time: post.createdAt
     ? new Date(post.createdAt).toLocaleDateString()
     : "Just now",
@@ -49,6 +49,19 @@ function RequireAuth({ children }) {
 function AppLayout() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    getProfile().then(setProfile).catch(() => {});
+  }, []);
+
+  const headerUser = profile
+    ? {
+        author: profile.fullName || profile.userName,
+        avatar: profile.avatar?.url,
+        email: profile.email,
+      }
+    : null;
 
   async function handleLogout() {
     await logoutUser().catch(() => {});
@@ -59,7 +72,7 @@ function AppLayout() {
   return (
     <main className="app-shell">
       <Header
-        user={user}
+        user={headerUser}
         profileOpen={profileOpen}
         onProfileToggle={() => setProfileOpen((open) => !open)}
         onCreatePost={() => {
@@ -80,7 +93,7 @@ function AppLayout() {
         }}
         onLogout={handleLogout}
       />
-      <Outlet />
+      <Outlet context={{ onProfileUpdated: setProfile }} />
     </main>
   );
 }
@@ -90,8 +103,11 @@ function FeedPage() {
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
-  const [feedPosts, setFeedPosts] = useState(posts);
+  const [feedPosts, setFeedPosts] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [feedError, setFeedError] = useState("");
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [showMyPosts, setShowMyPosts] = useState(
     Boolean(location.state?.myPostsOnly),
   );
@@ -104,9 +120,15 @@ function FeedPage() {
 
   useEffect(() => {
     const fetchPosts = showMyPosts ? getMyPosts : getPosts;
+    setIsLoadingPosts(true);
+    setFeedError("");
     fetchPosts()
       .then((apiPosts) => setFeedPosts(apiPosts.map(toFeedPost)))
-      .catch(() => {});
+      .catch((error) => {
+        setFeedPosts([]);
+        setFeedError(error.message || "Unable to load posts. Please try again.");
+      })
+      .finally(() => setIsLoadingPosts(false));
   }, [showMyPosts]);
 
   useEffect(() => {
@@ -132,8 +154,15 @@ function FeedPage() {
   }
 
   async function handleDeletePost(post) {
-    await deletePost(post._id).catch(() => {});
-    setFeedPosts((current) => current.filter((item) => item._id !== post._id));
+    setDeleteError("");
+    try {
+      await deletePost(post._id);
+      setFeedPosts((current) =>
+        current.filter((item) => item._id !== post._id),
+      );
+    } catch (error) {
+      setDeleteError(error.message || "Unable to delete post. Please try again.");
+    }
   }
 
   return (
@@ -147,15 +176,30 @@ function FeedPage() {
         </div>
       )}
       <section className="feed" id="top" aria-label="Social feed">
-        {feedPosts.map((post) => (
-          <FeedCard
-            key={post._id || post.title}
-            post={post}
-            isOwner={Boolean(currentUserId) && post.authorId === currentUserId}
-            onEdit={setEditingPost}
-            onDelete={handleDeletePost}
-          />
-        ))}
+        {deleteError && (
+          <p className="form-error" role="alert">
+            {deleteError}
+          </p>
+        )}
+        {feedError ? (
+          <p className="form-error" role="alert">
+            {feedError}
+          </p>
+        ) : isLoadingPosts ? (
+          <p className="profile-loading">Loading posts…</p>
+        ) : feedPosts.length === 0 ? (
+          <p className="profile-empty">No posts to show yet.</p>
+        ) : (
+          feedPosts.map((post) => (
+            <FeedCard
+              key={post._id || post.title}
+              post={post}
+              isOwner={Boolean(currentUserId) && post.authorId === currentUserId}
+              onEdit={setEditingPost}
+              onDelete={handleDeletePost}
+            />
+          ))
+        )}
       </section>
       {isCreating && (
         <CreatePostModal
@@ -185,8 +229,17 @@ export default function App() {
           <LoginPage
             onSignup={() => navigate("/signup")}
             onLogin={() => navigate("/posts")}
+            onForgotPassword={() => navigate("/forgot-password")}
           />
         }
+      />
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage onBackToLogin={() => navigate("/login")} />}
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage onReset={() => navigate("/posts")} />}
       />
       <Route
         path="/signup"

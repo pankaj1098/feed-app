@@ -28,10 +28,16 @@ export default function ProfileDropdown({
   return (
     <aside className="profile-dropdown" aria-label="Profile menu">
       <header className="dropdown-account">
-        <img src={user.avatar} alt="" />
+        {user?.avatar ? (
+          <img src={user.avatar} alt="" />
+        ) : (
+          <span className="avatar-placeholder" aria-hidden="true">
+            <Icon name="profile" />
+          </span>
+        )}
         <div>
-          <strong>{user.author}</strong>
-          <span>{user.email || "pankaj.yadav@example.com"}</span>
+          <strong>{user?.author || "Your account"}</strong>
+          <span>{user?.email || ""}</span>
         </div>
       </header>
       <MenuGroup items={mainItems} />

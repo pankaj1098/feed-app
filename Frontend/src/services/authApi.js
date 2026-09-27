@@ -16,11 +16,12 @@ async function request(path, options) {
 }
 
 export async function registerUser({ userName, email, password }) {
-  const { user } = await request("/api/auth/register", {
+  const { token, user } = await request("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userName, email, password }),
   });
+  localStorage.setItem("token", token);
   return user;
 }
 
@@ -31,6 +32,24 @@ export async function loginUser({ email, password }) {
     body: JSON.stringify({ email, password }),
   });
   localStorage.setItem("token", token);
+  return user;
+}
+
+export async function requestPasswordReset(email) {
+  return request("/api/auth/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword({ token, password }) {
+  const { token: authToken, user } = await request("/api/auth/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+  localStorage.setItem("token", authToken);
   return user;
 }
 
