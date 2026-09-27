@@ -7,6 +7,8 @@ const { OAuth2Client } = require("google-auth-library");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const RESET_TOKEN_LIFETIME_MS = 15 * 60 * 1000;
+
 const createToken = (user) => {
   const jwtSecret = process.env.JWT_SECRET;
 
@@ -26,6 +28,30 @@ const createToken = (user) => {
     },
   );
 };
+
+async function sendPasswordResetEmail(email, resetUrl) {
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+    throw new Error("Password reset email is not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM,
+      to: [email],
+      subject: "Reset your Feedly password",
+      html: `<p>We received a request to reset your Feedly password.</p><p><a href="${resetUrl}">Reset your password</a></p><p>This link expires in 15 minutes. If you did not request it, you can ignore this email.</p>`,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to send password reset email");
+  }
+}
 
 async function registerUsr(req, res) {
   try {
@@ -50,8 +76,16 @@ async function registerUsr(req, res) {
       password: hashedPassword,
     });
 
+    const token = createToken(user);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return res.status(201).json({
       message: "User registered successfully",
+      token,
       user: {
         id: user._id,
         userName: user.userName,
@@ -106,6 +140,93 @@ async function loginUsr(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ message: "Unable to login" });
+  }
+}
+
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await userModel.findOne({ email: email.toLowerCase().trim() });
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+      const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+      user.passwordResetToken = resetTokenHash;
+      user.passwordResetExpiresAt = new Date(Date.now() + RESET_TOKEN_LIFETIME_MS);
+      await user.save();
+
+      try {
+        await sendPasswordResetEmail(user.email, resetUrl);
+      } catch (error) {
+        user.passwordResetToken = undefined;
+        user.passwordResetExpiresAt = undefined;
+        await user.save();
+        throw error;
+      }
+    }
+
+    return res.status(200).json({
+      message: "If an account exists for that email, a reset link has been sent.",
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to send password reset email" });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ message: "Reset token and password are required" });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await userModel.findOne({
+      passwordResetToken: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "This reset link is invalid or has expired" });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    user.passwordResetToken = undefined;
+    user.passwordResetExpiresAt = undefined;
+    await user.save();
+
+    const authToken = createToken(user);
+    res.cookie("token", authToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      message: "Password reset successfully",
+      token: authToken,
+      user: {
+        id: user._id,
+        userName: user.userName,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to reset password" });
   }
 }
 
@@ -192,4 +313,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { registerUsr, loginUsr, googleLogin, logout };
+module.exports = { registerUsr, loginUsr, forgotPassword, resetPassword, googleLogin, logout };

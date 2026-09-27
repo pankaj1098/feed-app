@@ -26,6 +26,8 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    passwordResetToken: String,
+    passwordResetExpiresAt: Date,
     avatar: { url: String, fileId: String },
     fullName: { type: String, trim: true },
     bio: { type: String, maxlength: 150, trim: true },

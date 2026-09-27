@@ -19,6 +19,12 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const payload = jwt.verify(token, jwtSecret);
+
+    if (!payload.sub || !payload.jti) {
+      return res.status(401).json({
+        message: "Invalid token",
+      });
+    }
     const tokenId = payload.jti;
 
     if (!tokenId) {
@@ -57,7 +63,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     return res.status(500).json({
-      message: error.message,
+      message: "Internal server error",
     });
   }
 };
