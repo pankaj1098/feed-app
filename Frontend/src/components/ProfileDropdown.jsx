@@ -31,11 +31,11 @@ export default function ProfileDropdown({
         {user?.avatar ? (
           <img src={user.avatar} alt="" />
         ) : (
-          <span className="avatar-placeholder" aria-hidden="true">
+          <span className="profile-icon-placeholder" aria-hidden="true">
             <Icon name="profile" />
           </span>
         )}
-        <div>
+        <div className="dropdown-account-info">
           <strong>{user?.author || "Your account"}</strong>
           <span>{user?.email || ""}</span>
         </div>

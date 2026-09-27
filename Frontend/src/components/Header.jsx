@@ -34,7 +34,10 @@ export default function Header({
                 alt={user.author}
               />
             ) : (
-              <span className="account-avatar avatar-placeholder" aria-hidden="true">
+              <span
+                className="account-avatar avatar-placeholder"
+                aria-hidden="true"
+              >
                 <Icon name="profile" />
               </span>
             )}

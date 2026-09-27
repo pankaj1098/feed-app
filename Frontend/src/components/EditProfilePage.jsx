@@ -107,7 +107,7 @@ export default function EditProfilePage() {
           <form className="profile-form" onSubmit={submit}>
             <div className="avatar-editor">
               <span className="field-label">Profile Photo</span>
-              <div className="avatar-frame">
+              <div className="profile-avatar-frame">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Profile" />
                 ) : (
@@ -254,7 +254,11 @@ export default function EditProfilePage() {
               >
                 Cancel
               </button>
-              <button className="submit-button" type="submit" disabled={isSaving}>
+              <button
+                className="submit-button"
+                type="submit"
+                disabled={isSaving}
+              >
                 {isSaving ? "Saving…" : "Save Changes"}
               </button>
             </footer>
