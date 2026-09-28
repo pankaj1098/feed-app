@@ -148,38 +148,62 @@ async function forgotPassword(req, res) {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+      return res.status(400).json({
+        message: "Email is required",
+      });
     }
 
-    const user = await userModel.findOne({ email: email.toLowerCase().trim() });
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString("hex");
-      const resetTokenHash = crypto
-        .createHash("sha256")
-        .update(resetToken)
-        .digest("hex");
-      const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
-      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+    const normalizedEmail = email.toLowerCase().trim();
 
-      user.passwordResetToken = resetTokenHash;
-      user.passwordResetExpiresAt = new Date(Date.now() + RESET_TOKEN_LIFETIME_MS);
+    const user = await userModel.findOne({
+      email: normalizedEmail,
+    });
+
+    // Email does not exist
+    if (!user) {
+      return res.status(404).json({
+        message: "Email does not exist",
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    const frontendUrl = (
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    ).replace(/\/$/, "");
+
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    user.passwordResetToken = resetTokenHash;
+    user.passwordResetExpiresAt = new Date(
+      Date.now() + RESET_TOKEN_LIFETIME_MS,
+    );
+
+    await user.save();
+
+    try {
+      await sendPasswordResetEmail(user.email, resetUrl);
+    } catch (error) {
+      user.passwordResetToken = undefined;
+      user.passwordResetExpiresAt = undefined;
+
       await user.save();
 
-      try {
-        await sendPasswordResetEmail(user.email, resetUrl);
-      } catch (error) {
-        user.passwordResetToken = undefined;
-        user.passwordResetExpiresAt = undefined;
-        await user.save();
-        throw error;
-      }
+      throw error;
     }
 
     return res.status(200).json({
-      message: "If an account exists for that email, a reset link has been sent.",
+      message: "Password reset link has been sent to your email.",
     });
   } catch (error) {
-    return res.status(500).json({ message: "Unable to send password reset email" });
+    return res.status(500).json({
+      message: "Unable to send password reset email",
+    });
   }
 }
 
@@ -188,11 +212,15 @@ async function resetPassword(req, res) {
     const { token, password } = req.body;
 
     if (!token || !password) {
-      return res.status(400).json({ message: "Reset token and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Reset token and password are required" });
     }
 
     if (password.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters" });
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters" });
     }
 
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -202,7 +230,9 @@ async function resetPassword(req, res) {
     });
 
     if (!user) {
-      return res.status(400).json({ message: "This reset link is invalid or has expired" });
+      return res
+        .status(400)
+        .json({ message: "This reset link is invalid or has expired" });
     }
 
     user.password = await bcrypt.hash(password, 10);
@@ -235,9 +265,7 @@ async function googleLogin(req, res) {
     const { credential } = req.body;
 
     if (!credential) {
-      return res
-        .status(400)
-        .json({ message: "Google credential is required" });
+      return res.status(400).json({ message: "Google credential is required" });
     }
 
     const ticket = await googleClient.verifyIdToken({
@@ -313,4 +341,11 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { registerUsr, loginUsr, forgotPassword, resetPassword, googleLogin, logout };
+module.exports = {
+  registerUsr,
+  loginUsr,
+  forgotPassword,
+  resetPassword,
+  googleLogin,
+  logout,
+};
