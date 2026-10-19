@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { Icon } from "./Icons";
 import { getProfile, updateProfile } from "../services/userApi";
+import { resizeImage } from "../utils/resizeImage";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -52,11 +53,18 @@ export default function EditProfilePage() {
   const set = (key) => (event) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
-  function chooseAvatar(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+  async function chooseAvatar(event) {
+    const picked = event.target.files?.[0];
+    if (!picked) return;
+    if (!ALLOWED_AVATAR_TYPES.includes(picked.type)) {
       setError("Profile photo must be a JPG, PNG or WebP image.");
+      return;
+    }
+    let file;
+    try {
+      file = await resizeImage(picked, { maxSide: 800 });
+    } catch {
+      setError("This image could not be read. Please choose another photo.");
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {

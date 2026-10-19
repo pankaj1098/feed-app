@@ -25,6 +25,7 @@ const authMiddleware = async (req, res, next) => {
         message: "Invalid token",
       });
     }
+
     const tokenId = payload.jti;
 
     if (!tokenId) {

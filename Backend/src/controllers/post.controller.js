@@ -1,6 +1,47 @@
 const postModel = require("../models/post.model");
 const uploadFile = require("../services/storage.services");
 
+const MAX_TAGS = 10;
+const MAX_TAG_LENGTH = 30;
+
+// Tags arrive from FormData as a JSON array string, but a comma separated
+// string is accepted too. Stored lowercase without the leading "#".
+function parseTags(raw) {
+  if (raw === undefined) return undefined;
+  let list = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      list = raw.split(",");
+    }
+  }
+  if (!Array.isArray(list)) list = [list];
+
+  const tags = list
+    .map((tag) =>
+      String(tag)
+        .trim()
+        .replace(/^#+/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "")
+        .slice(0, MAX_TAG_LENGTH),
+    )
+    .filter(Boolean);
+  return [...new Set(tags)].slice(0, MAX_TAGS);
+}
+
+function parseCategory(raw) {
+  if (raw === undefined) return undefined;
+  return String(raw).trim().slice(0, 30);
+}
+
+// Array.from splits by code point so a multi-unit emoji is never cut in half.
+function parseEmoji(raw) {
+  if (raw === undefined) return undefined;
+  return Array.from(String(raw).trim()).slice(0, 8).join("");
+}
+
 async function createPost(req, res) {
   if (!req.file) {
     return res.status(400).json({ message: "An image is required" });
@@ -13,11 +54,17 @@ async function createPost(req, res) {
       image: result.url,
       caption: req.body.caption,
       description: req.body.description,
+      category: parseCategory(req.body.category) || "",
+      tags: parseTags(req.body.tags) || [],
+      emoji: parseEmoji(req.body.emoji) || "",
       author: req.user.id,
     });
     await post.populate("author", "userName avatar");
     return res.status(201).json({ message: "Post created successfully", post });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
     return res.status(500).json({ message: "Unable to create post" });
   }
 }
@@ -67,6 +114,12 @@ async function updatePost(req, res) {
     if (req.body.caption !== undefined) post.caption = req.body.caption;
     if (req.body.description !== undefined)
       post.description = req.body.description;
+    const category = parseCategory(req.body.category);
+    if (category !== undefined) post.category = category;
+    const tags = parseTags(req.body.tags);
+    if (tags !== undefined) post.tags = tags;
+    const emoji = parseEmoji(req.body.emoji);
+    if (emoji !== undefined) post.emoji = emoji;
 
     if (req.file) {
       const result = await uploadFile(req.file.buffer);
@@ -82,6 +135,9 @@ async function updatePost(req, res) {
   } catch (error) {
     if (error.name === "CastError") {
       return res.status(400).json({ message: "Invalid post id" });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
     }
     return res.status(500).json({ message: "Unable to update post" });
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Navigate,
   Outlet,
@@ -34,9 +34,10 @@ const toFeedPost = (post) => ({
   time: post.createdAt
     ? new Date(post.createdAt).toLocaleDateString()
     : "Just now",
-  category: "Nature",
+  category: post.category || "",
   tone: "violet",
-  tags: [],
+  tags: Array.isArray(post.tags) ? post.tags : [],
+  emoji: post.emoji || "",
   title: post.caption || post.title,
   copy: post.description || post.copy || "",
 });
@@ -50,9 +51,12 @@ function AppLayout() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState(null);
+  const closeProfile = useCallback(() => setProfileOpen(false), []);
 
   useEffect(() => {
-    getProfile().then(setProfile).catch(() => {});
+    getProfile()
+      .then(setProfile)
+      .catch(() => {});
   }, []);
 
   const headerUser = profile
@@ -75,6 +79,7 @@ function AppLayout() {
         user={headerUser}
         profileOpen={profileOpen}
         onProfileToggle={() => setProfileOpen((open) => !open)}
+        onProfileClose={closeProfile}
         onCreatePost={() => {
           setProfileOpen(false);
           navigate("/posts", { state: { openCreate: true } });
@@ -126,7 +131,9 @@ function FeedPage() {
       .then((apiPosts) => setFeedPosts(apiPosts.map(toFeedPost)))
       .catch((error) => {
         setFeedPosts([]);
-        setFeedError(error.message || "Unable to load posts. Please try again.");
+        setFeedError(
+          error.message || "Unable to load posts. Please try again.",
+        );
       })
       .finally(() => setIsLoadingPosts(false));
   }, [showMyPosts]);
@@ -161,7 +168,9 @@ function FeedPage() {
         current.filter((item) => item._id !== post._id),
       );
     } catch (error) {
-      setDeleteError(error.message || "Unable to delete post. Please try again.");
+      setDeleteError(
+        error.message || "Unable to delete post. Please try again.",
+      );
     }
   }
 
@@ -194,7 +203,9 @@ function FeedPage() {
             <FeedCard
               key={post._id || post.title}
               post={post}
-              isOwner={Boolean(currentUserId) && post.authorId === currentUserId}
+              isOwner={
+                Boolean(currentUserId) && post.authorId === currentUserId
+              }
               onEdit={setEditingPost}
               onDelete={handleDeletePost}
             />
@@ -235,7 +246,9 @@ export default function App() {
       />
       <Route
         path="/forgot-password"
-        element={<ForgotPasswordPage onBackToLogin={() => navigate("/login")} />}
+        element={
+          <ForgotPasswordPage onBackToLogin={() => navigate("/login")} />
+        }
       />
       <Route
         path="/reset-password"

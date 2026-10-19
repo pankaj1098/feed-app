@@ -77,7 +77,7 @@ async function updateProfile(req, res) {
       .status(200)
       .json({ message: "Profile updated successfully", user });
   } catch (error) {
-    if (error.name === "ValidationError") {
+    if (error.name === "ValidationError" || error.statusCode === 400) {
       return res.status(400).json({ message: error.message });
     }
 
