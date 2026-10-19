@@ -3,6 +3,17 @@ import AuthLayout from "./AuthLayout";
 import { AuthInput, SocialButtons } from "./AuthFields";
 import { loginUser, googleLogin } from "../services/authApi";
 
+// TEMP: confirm which Google client ID this build was made with. Remove once
+// the origin_mismatch issue is resolved.
+const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
+const googleClientIdCore = googleClientId.replace(".apps.googleusercontent.com", "");
+console.log(
+  "[google-debug] VITE_GOOGLE_CLIENT_ID:",
+  googleClientId
+    ? `${googleClientIdCore.slice(0, 6)}…${googleClientIdCore.slice(-6)}.apps.googleusercontent.com`
+    : "(not set in this build)",
+);
+
 export default function LoginPage({ onSignup, onLogin, onForgotPassword }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
