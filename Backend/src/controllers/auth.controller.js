@@ -113,6 +113,14 @@ async function loginUsr(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Accounts created through Google have no password to compare against.
+    if (!user.password) {
+      return res.status(401).json({
+        message:
+          "This account uses Google sign-in. Continue with Google or reset your password.",
+      });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -261,30 +269,56 @@ async function resetPassword(req, res) {
 }
 
 async function googleLogin(req, res) {
+  const { credential } = req.body || {};
+
+  if (!credential) {
+    return res.status(400).json({ message: "Google credential is required" });
+  }
+
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    console.error("Google login: GOOGLE_CLIENT_ID is not set");
+    return res.status(500).json({ message: "Google sign-in is not configured" });
+  }
+
+  // Only a failed verification means the credential is bad; database or
+  // validation errors further down are reported separately.
+  let payload;
   try {
-    const { credential } = req.body;
-
-    if (!credential) {
-      return res.status(400).json({ message: "Google credential is required" });
-    }
-
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    const payload = ticket.getPayload();
+    payload = ticket.getPayload();
+  } catch (error) {
+    console.error("Google login: token verification failed:", error.message);
+    return res.status(401).json({ message: "Invalid Google credential" });
+  }
 
-    let user = await userModel.findOne({ email: payload.email });
+  if (!payload?.email || !payload.email_verified) {
+    return res
+      .status(401)
+      .json({ message: "Your Google account email is not verified" });
+  }
+
+  try {
+    const email = payload.email.toLowerCase();
+    let user = await userModel.findOne({ email });
 
     if (!user) {
       user = await userModel.create({
-        userName: payload.name,
-        email: payload.email,
+        // Google omits `name` for some accounts; userName is required.
+        userName: payload.name || payload.given_name || email.split("@")[0],
+        fullName: payload.name,
+        email,
         googleId: payload.sub,
+        ...(payload.picture ? { avatar: { url: payload.picture } } : {}),
       });
-    } else if (!user.googleId) {
-      user.googleId = payload.sub;
-      await user.save();
+    } else {
+      if (!user.googleId) user.googleId = payload.sub;
+      if (!user.avatar?.url && payload.picture) {
+        user.avatar = { url: payload.picture };
+      }
+      if (user.isModified()) await user.save();
     }
 
     const token = createToken(user);
@@ -304,7 +338,13 @@ async function googleLogin(req, res) {
       },
     });
   } catch (error) {
-    return res.status(401).json({ message: "Invalid Google credential" });
+    console.error("Google login failed:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ message: "This Google account is linked to another user" });
+    }
+    return res.status(500).json({ message: "Unable to sign in with Google" });
   }
 }
 

@@ -44,6 +44,13 @@ export function AuthInput({
 }
 
 export function SocialButtons({ onGoogleSuccess, onGoogleError }) {
+  // Without a client ID the Google button cannot load (e.g. the env var is
+  // missing in a deployment), so hide it instead of showing a broken button.
+  if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+    if (import.meta.env.DEV) console.warn("VITE_GOOGLE_CLIENT_ID is not set");
+    return null;
+  }
+
   return (
     <>
       <div className="auth-divider">
