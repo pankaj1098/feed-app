@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { Icon } from "./Icons";
 
@@ -58,12 +58,41 @@ export function SocialButtons({ onGoogleSuccess, onGoogleError }) {
         or
         <span />
       </div>
-      <GoogleLogin
+      <FullWidthGoogleLogin
         onSuccess={(credentialResponse) =>
           onGoogleSuccess?.(credentialResponse.credential)
         }
         onError={() => onGoogleError?.("Google sign-in failed")}
       />
     </>
+  );
+}
+
+// Google's button only accepts a pixel width (max 400), so measure the
+// container and pass that in to make it span the full form width.
+function FullWidthGoogleLogin(props) {
+  const ref = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setWidth(Math.floor(el.getBoundingClientRect().width));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ width: "100%" }}>
+      {width > 0 && (
+        <GoogleLogin
+          {...props}
+          width={Math.min(width, 400)}
+          key={Math.min(width, 400)}
+        />
+      )}
+    </div>
   );
 }
